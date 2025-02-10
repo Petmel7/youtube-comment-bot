@@ -1,5 +1,5 @@
 const { getComments, replyToComment } = require('./services/youtube');
-const { generateResponse } = require('./services/openai');
+const { generateResponse } = require('./services/geminiai');
 
 (async () => {
     const comments = await getComments();
