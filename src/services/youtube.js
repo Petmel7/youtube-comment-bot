@@ -1,8 +1,35 @@
 
 const axios = require("axios");
-const { getAccessToken } = require('../config/oauth');
+const fs = require("fs");
+const path = require("path");
+const { getAccessToken } = require("../config/oauth");
 const { YOUTUBE_API_KEY, CHANNEL_ID } = require("../config/config");
 
+// Шлях до файлу, де зберігаються оброблені коментарі
+const REPLIED_COMMENTS_FILE = path.join(__dirname, "replied_comments.json");
+
+// Завантажуємо список оброблених коментарів
+function loadRepliedComments() {
+    try {
+        if (fs.existsSync(REPLIED_COMMENTS_FILE)) {
+            return JSON.parse(fs.readFileSync(REPLIED_COMMENTS_FILE, "utf-8"));
+        }
+    } catch (error) {
+        console.error("❌ Помилка при читанні файлу з обробленими коментарями:", error.message);
+    }
+    return [];
+}
+
+// Зберігаємо ID оброблених коментарів
+function saveRepliedComments(comments) {
+    try {
+        fs.writeFileSync(REPLIED_COMMENTS_FILE, JSON.stringify(comments, null, 2));
+    } catch (error) {
+        console.error("❌ Помилка при збереженні файлу з обробленими коментарями:", error.message);
+    }
+}
+
+// Отримуємо останнє відео з каналу
 async function getLatestVideoId() {
     const url = `https://www.googleapis.com/youtube/v3/search?key=${YOUTUBE_API_KEY}&channelId=${CHANNEL_ID}&part=id&type=video&maxResults=1`;
     try {
@@ -14,6 +41,7 @@ async function getLatestVideoId() {
     }
 }
 
+// Отримуємо список коментарів
 async function getComments() {
     const videoId = await getLatestVideoId();
     console.log("✅ videoId", videoId);
@@ -22,10 +50,14 @@ async function getComments() {
     const url = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&key=${YOUTUBE_API_KEY}`;
     try {
         const response = await axios.get(url);
-        return response.data.items.map(item => ({
-            id: item.id,
-            text: item.snippet.topLevelComment.snippet.textDisplay
-        }));
+        const repliedComments = loadRepliedComments();
+
+        return response.data.items
+            .map(item => ({
+                id: item.id,
+                text: item.snippet.topLevelComment.snippet.textDisplay
+            }))
+            .filter(comment => !repliedComments.includes(comment.id)); // Фільтруємо вже оброблені коментарі
     } catch (error) {
         console.error("❌ Помилка при отриманні коментарів:", error.message);
         return [];
@@ -34,22 +66,44 @@ async function getComments() {
 
 async function replyToComment(commentId, responseText) {
     try {
-
         const accessToken = await getAccessToken();
-        console.log("✅ Використовується токен:", accessToken); // Додати для перевірки
-
+        console.log("✅ Використовується токен:", accessToken);
 
         const url = "https://www.googleapis.com/youtube/v3/comments?part=snippet";
         const data = { snippet: { parentId: commentId, textOriginal: responseText } };
         const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
 
+        // Відповідаємо на коментар
         const response = await axios.post(url, data, { headers });
-        // console.log(`📌 Відповідь додана під відео: https://www.youtube.com/watch?v=${response.data.snippet.videoId}`);
-
         console.log("✅ Відповідь додана:", response.data);
+
+        // Додаємо лайк на коментар
+        // await addHeartToComment(commentId, accessToken);
+
+        // Зберігаємо коментар у список оброблених
+        const repliedComments = loadRepliedComments();
+        repliedComments.push(commentId);
+        saveRepliedComments(repliedComments);
     } catch (error) {
-        console.error("❌ Помилка при відповіді на коментар:", error.message);
+        if (error.response) {
+            console.error("❌ Помилка при відповіді на коментар:", error.response.data);
+        } else {
+            console.error("❌ Помилка:", error.message);
+        }
     }
 }
+
+// // Функція для додавання сердечка (лайка) на коментар
+// async function addHeartToComment(commentId, accessToken) {
+//     try {
+//         const url = `https://www.googleapis.com/youtube/v3/comments/setModerationStatus?id=${commentId}&moderationStatus=published`;
+//         const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
+
+//         const response = await axios.post(url, {}, { headers });
+//         console.log("❤️ Сердечко додано на коментар:", response.data);
+//     } catch (error) {
+//         console.error("❌ Помилка при додаванні сердечка:", error.response?.data || error.message);
+//     }
+// }
 
 module.exports = { getComments, replyToComment };
