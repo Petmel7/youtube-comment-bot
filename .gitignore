@@ -1,5 +1,6 @@
 .env
 node_modules
-client_secret.json
 token.json
+client_secret.json
 src/config/token.json
+src/config/client_secret.json
