@@ -77,9 +77,6 @@ async function replyToComment(commentId, responseText) {
         const response = await axios.post(url, data, { headers });
         console.log("✅ Відповідь додана:", response.data);
 
-        // Додаємо лайк на коментар
-        // await addHeartToComment(commentId, accessToken);
-
         // Зберігаємо коментар у список оброблених
         const repliedComments = loadRepliedComments();
         repliedComments.push(commentId);
@@ -92,18 +89,5 @@ async function replyToComment(commentId, responseText) {
         }
     }
 }
-
-// // Функція для додавання сердечка (лайка) на коментар
-// async function addHeartToComment(commentId, accessToken) {
-//     try {
-//         const url = `https://www.googleapis.com/youtube/v3/comments/setModerationStatus?id=${commentId}&moderationStatus=published`;
-//         const headers = { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" };
-
-//         const response = await axios.post(url, {}, { headers });
-//         console.log("❤️ Сердечко додано на коментар:", response.data);
-//     } catch (error) {
-//         console.error("❌ Помилка при додаванні сердечка:", error.response?.data || error.message);
-//     }
-// }
 
 module.exports = { getComments, replyToComment };
